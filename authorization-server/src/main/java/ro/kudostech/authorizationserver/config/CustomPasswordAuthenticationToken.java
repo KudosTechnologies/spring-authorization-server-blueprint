@@ -20,7 +20,7 @@ public class CustomPasswordAuthenticationToken extends OAuth2AuthorizationGrantA
       Authentication clientPrincipal,
       @Nullable Set<String> scopes,
       @Nullable Map<String, Object> additionalParameters) {
-    super(new AuthorizationGrantType("custom_password"), clientPrincipal, additionalParameters);
+    super(AuthorizationGrantType.PASSWORD, clientPrincipal, additionalParameters);
     this.username = (String) additionalParameters.get("username");
     this.password = (String) additionalParameters.get("password");
     this.scopes =

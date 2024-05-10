@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -37,7 +36,6 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.AuthenticationConverter;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import ro.kudostech.authorizationserver.model.CustomPasswordUser;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
@@ -45,16 +43,13 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.resource.OAuth2ResourceServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 
-
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.nimbusds.jose.jwk.JWKSet;
@@ -82,23 +77,13 @@ public class SecurityConfig {
                     .accessTokenRequestConverter(new CustomPassordAuthenticationConverter())
                     .authenticationProvider(
                         new CustomPassordAuthenticationProvider(
-                            authorizationService(), tokenGenerator(), userDetailsService()))
-                    .accessTokenRequestConverters(getConverters())
-                    .authenticationProviders(getProviders()))
+                            authorizationService(), tokenGenerator(), userDetailsService())))
         .oidc(withDefaults())
         .and()
         .exceptionHandling(
             e -> e.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")))
         .oauth2ResourceServer(OAuth2ResourceServerConfigurer::jwt)
         .build();
-  }
-
-  private Consumer<List<AuthenticationProvider>> getProviders() {
-    return a -> a.forEach(System.out::println);
-  }
-
-  private Consumer<List<AuthenticationConverter>> getConverters() {
-    return a -> a.forEach(System.out::println);
   }
 
   @Bean
@@ -150,7 +135,7 @@ public class SecurityConfig {
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
             .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
             .authorizationGrantType(AuthorizationGrantType.JWT_BEARER)
-            .authorizationGrantType(new AuthorizationGrantType("custom_password"))
+            .authorizationGrantType(AuthorizationGrantType.PASSWORD)
             .tokenSettings(tokenSettings())
             .clientSettings(clientSettings())
             .build();
@@ -177,7 +162,7 @@ public class SecurityConfig {
   }
 
   @Bean
-  public OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator() {
+  public OAuth2TokenGenerator<OAuth2Token> tokenGenerator() {
     NimbusJwtEncoder jwtEncoder = new NimbusJwtEncoder(jwkSource());
     JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
     jwtGenerator.setJwtCustomizer(tokenCustomizer());

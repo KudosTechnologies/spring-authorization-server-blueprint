@@ -3,6 +3,7 @@ package ro.kudostech.authorizationserver.config;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -30,10 +31,10 @@ import org.springframework.util.Assert;
 import ro.kudostech.authorizationserver.model.CustomPasswordUser;
 
 import java.security.Principal;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@SuppressWarnings("deprecation")
 public class CustomPassordAuthenticationProvider implements AuthenticationProvider {
 
   private static final String ERROR_URI =
@@ -41,9 +42,6 @@ public class CustomPassordAuthenticationProvider implements AuthenticationProvid
   private final OAuth2AuthorizationService authorizationService;
   private final UserDetailsService userDetailsService;
   private final OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator;
-  private String username = "";
-  private String password = "";
-  private Set<String> authorizedScopes = new HashSet<>();
 
   public CustomPassordAuthenticationProvider(
       OAuth2AuthorizationService authorizationService,
@@ -66,9 +64,9 @@ public class CustomPassordAuthenticationProvider implements AuthenticationProvid
     OAuth2ClientAuthenticationToken clientPrincipal =
         getAuthenticatedClientElseThrowInvalidClient(customPasswordAuthenticationToken);
     RegisteredClient registeredClient = clientPrincipal.getRegisteredClient();
-    username = customPasswordAuthenticationToken.getUsername();
-    password = customPasswordAuthenticationToken.getPassword();
-    User user = null;
+    String username = customPasswordAuthenticationToken.getUsername();
+    String password = customPasswordAuthenticationToken.getPassword();
+    User user;
     try {
       user = (User) userDetailsService.loadUserByUsername(username);
     } catch (UsernameNotFoundException e) {
@@ -77,10 +75,14 @@ public class CustomPassordAuthenticationProvider implements AuthenticationProvid
     if (!user.getPassword().equals(password) || !user.getUsername().equals(username)) {
       throw new OAuth2AuthenticationException(OAuth2ErrorCodes.ACCESS_DENIED);
     }
-    authorizedScopes =
+    Set<String> authorizedScopes =
         user.getAuthorities().stream()
-            .map(scope -> scope.getAuthority())
-            .filter(scope -> registeredClient.getScopes().contains(scope))
+            .map(GrantedAuthority::getAuthority)
+            .filter(
+                scope -> {
+                  assert registeredClient != null;
+                  return registeredClient.getScopes().contains(scope);
+                })
             .collect(Collectors.toSet());
 
     // -----------Create a new Security Context Holder Context----------
@@ -100,14 +102,15 @@ public class CustomPassordAuthenticationProvider implements AuthenticationProvid
             .principal(clientPrincipal)
             .authorizationServerContext(AuthorizationServerContextHolder.getContext())
             .authorizedScopes(authorizedScopes)
-            .authorizationGrantType(new AuthorizationGrantType("custom_password"))
+            .authorizationGrantType(AuthorizationGrantType.PASSWORD)
             .authorizationGrant(customPasswordAuthenticationToken);
 
+    assert registeredClient != null;
     OAuth2Authorization.Builder authorizationBuilder =
         OAuth2Authorization.withRegisteredClient(registeredClient)
             .attribute(Principal.class.getName(), clientPrincipal)
             .principalName(clientPrincipal.getName())
-            .authorizationGrantType(new AuthorizationGrantType("custom_password"))
+            .authorizationGrantType(AuthorizationGrantType.PASSWORD)
             .authorizedScopes(authorizedScopes);
 
     // -----------ACCESS TOKEN----------
@@ -130,13 +133,12 @@ public class CustomPassordAuthenticationProvider implements AuthenticationProvid
             generatedAccessToken.getIssuedAt(),
             generatedAccessToken.getExpiresAt(),
             tokenContext.getAuthorizedScopes());
-    if (generatedAccessToken instanceof ClaimAccessor) {
+    if (generatedAccessToken instanceof ClaimAccessor claimAccessor) {
       authorizationBuilder.token(
           accessToken,
-          (metadata) ->
+          metadata ->
               metadata.put(
-                  OAuth2Authorization.Token.CLAIMS_METADATA_NAME,
-                  ((ClaimAccessor) generatedAccessToken).getClaims()));
+                  OAuth2Authorization.Token.CLAIMS_METADATA_NAME, claimAccessor.getClaims()));
     } else {
       authorizationBuilder.accessToken(accessToken);
     }

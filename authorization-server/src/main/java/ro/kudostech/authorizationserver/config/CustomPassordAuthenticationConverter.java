@@ -9,6 +9,7 @@ import java.util.Set;
 import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
@@ -19,6 +20,7 @@ import org.springframework.util.StringUtils;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+@SuppressWarnings("deprecation")
 public class CustomPassordAuthenticationConverter implements AuthenticationConverter {
 
   @Nullable
@@ -27,7 +29,7 @@ public class CustomPassordAuthenticationConverter implements AuthenticationConve
 
     String grantType = request.getParameter(OAuth2ParameterNames.GRANT_TYPE);
 
-    if (!"custom_password".equals(grantType)) {
+    if (!AuthorizationGrantType.PASSWORD.getValue().equals(grantType)) {
       return null;
     }
 
@@ -64,7 +66,7 @@ public class CustomPassordAuthenticationConverter implements AuthenticationConve
         (key, value) -> {
           if (!key.equals(OAuth2ParameterNames.GRANT_TYPE)
               && !key.equals(OAuth2ParameterNames.SCOPE)) {
-            additionalParameters.put(key, value.get(0));
+            additionalParameters.put(key, value.getFirst());
           }
         });
 
@@ -78,10 +80,8 @@ public class CustomPassordAuthenticationConverter implements AuthenticationConve
     MultiValueMap<String, String> parameters = new LinkedMultiValueMap<>(parameterMap.size());
     parameterMap.forEach(
         (key, values) -> {
-          if (values.length > 0) {
-            for (String value : values) {
-              parameters.add(key, value);
-            }
+          for (String value : values) {
+            parameters.add(key, value);
           }
         });
     return parameters;
