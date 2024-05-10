@@ -1,0 +1,20 @@
+#management.tracing.enabled: true
+server.servlet.context-path: /v1
+spring:
+  threads:
+    virtual:
+      enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080
+          jwk-set-uri: http://localhost:8080/oauth2/jwks
+server:
+  port: 8081
+
+
+logging:
+  level:
+    root: info
+    org.springframework.security: trace
